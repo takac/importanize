@@ -50,7 +50,7 @@ class TestMain(unittest.TestCase):
             run_importanize(
                 test_file,
                 PEP8_CONFIG,
-                mock.MagicMock(print=True,
+                mock.MagicMock(print=True, assert_only=False,
                                formatter='grouped'))
         )
         mock_print.assert_called_once_with(expected)
@@ -73,7 +73,7 @@ class TestMain(unittest.TestCase):
             run_importanize(
                 test_file,
                 PEP8_CONFIG,
-                mock.MagicMock(print=True,
+                mock.MagicMock(print=True, assert_only=False,
                                formatter='inline-grouped'))
         )
         mock_print.assert_called_once_with(expected)
@@ -97,7 +97,7 @@ class TestMain(unittest.TestCase):
             run_importanize(
                 test_file,
                 PEP8_CONFIG,
-                mock.MagicMock(print=True,
+                mock.MagicMock(print=True, assert_only=False,
                                formatter='UnavailableFormatter'))
         )
         mock_print.assert_called_once_with(expected)
@@ -116,13 +116,28 @@ class TestMain(unittest.TestCase):
             run_importanize(
                 test_file,
                 PEP8_CONFIG,
-                mock.MagicMock(print=False,
+                mock.MagicMock(print=False, assert_only=False,
                                formatter='grouped'))
         )
         mock_open.assert_called_once_with(test_file, 'wb')
         mock_open.return_value \
             .__enter__.return_value \
             .write.assert_called_once_with(expected)
+
+    @mock.patch(TESTING_MODULE + '.open', create=True)
+    def test_run_importanize_assert_only(self, mock_open):
+        test_file = os.path.join(os.path.dirname(__file__),
+                                 'test_data',
+                                 'input.txt')
+
+        self.assertTrue(
+            run_importanize(
+                test_file,
+                PEP8_CONFIG,
+                mock.MagicMock(print=False, assert_only=True,
+                               formatter='grouped'))
+        )
+        mock_open.assert_not_called()
 
     @mock.patch(TESTING_MODULE + '.open', create=True)
     def test_run_importanize_write_inline_group_formatter(self, mock_open):
@@ -138,7 +153,7 @@ class TestMain(unittest.TestCase):
             run_importanize(
                 test_file,
                 PEP8_CONFIG,
-                mock.MagicMock(print=False,
+                mock.MagicMock(print=False, assert_only=False,
                                formatter='inline-grouped'))
         )
         mock_open.assert_called_once_with(test_file, 'wb')
@@ -267,6 +282,7 @@ class TestMain(unittest.TestCase):
             version=False,
             path=[os.path.join('path', '..')],
             config=None,
+            assert_only=False,
         )
         mock_parse_args.return_value = args
 
@@ -293,6 +309,7 @@ class TestMain(unittest.TestCase):
             version=False,
             path=[os.path.join('path', '..')],
             config=mock.sentinel.config,
+            assert_only=False,
         )
         mock_parse_args.return_value = args
 

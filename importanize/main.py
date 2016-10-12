@@ -116,6 +116,13 @@ parser.add_argument(
          'files will be printed to stdout.'
 )
 parser.add_argument(
+    '--assert-only', '-a',
+    action='store_true',
+    default=False,
+    help=('Only assert that the correct imports are present, do not'
+          'rewrite files. Exit code 1 when there are files that need fixing.')
+)
+parser.add_argument(
     '--version',
     action='store_true',
     default=False,
@@ -130,6 +137,7 @@ parser.add_argument(
 )
 
 
+# Return False if ignored or not modified
 def run_importanize(path, config, args):
     if config.get('exclude'):
         if any(map(lambda i: fnmatch(path, i), config.get('exclude'))):
@@ -137,6 +145,7 @@ def run_importanize(path, config, args):
             return False
 
     text = read(path)
+    original = text
     file_artifacts = get_file_artifacts(path)
 
     # Get formatter from args or config
@@ -183,20 +192,28 @@ def run_importanize(path, config, args):
 
     lines = file_artifacts.get('sep', '\n').join(lines)
 
+    encoded = lines.encode('utf-8')
     if args.print:
-        print(lines.encode('utf-8') if not six.PY3 else lines)
+        print(encoded if not six.PY3 else lines)
     else:
-        with open(path, 'wb') as fid:
-            fid.write(lines.encode('utf-8'))
+        # Only re-write file if contents is different
+        if not args.assert_only and encoded != original:
+            with open(path, 'wb') as fid:
+                fid.write(encoded)
 
     log.info('Successfully importanized {}'.format(path))
+    if encoded == original:
+        return False
+    if args.assert_only:
+        print("{} imports are incorrect".format(path))
     return True
 
 
 def run(path, config, args):
+    result = []
     if not os.path.isdir(path):
         try:
-            run_importanize(path, config, args)
+            result.append(run_importanize(path, config, args))
         except Exception as e:
             log.exception('Error running importanize for {}'
                           ''.format(path))
@@ -215,11 +232,12 @@ def run(path, config, args):
                     print(path)
                     print('-' * len(path))
                 try:
-                    run_importanize(path, config, args)
+                    result.append(run_importanize(path, config, args))
                 except Exception as e:
                     log.exception('Error running importanize for {}'
                                   ''.format(path))
                     parser.error(six.text_type(e))
+    return all(result)
 
 
 def main():
@@ -248,6 +266,9 @@ def main():
     else:
         config = json.loads(read(args.config))
 
+    if config.get('assert_only', None) is None:
+        config['assert_only'] = args.assert_only
     for p in args.path:
         path = os.path.abspath(p)
-        run(path, config, args)
+        if not run(path, config, args) and config.get('assert_only') is True:
+            sys.exit(1)
